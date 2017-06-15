@@ -1,28 +1,133 @@
-# Loader
+ Sample project using angular and webpack preprocess-loader (https://www.npmjs.com/package/preprocess-loader).  
+ This is NOT WORKING.
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 1.1.1.
+Main steps to reproduce :
 
-## Development server
+1. Create a new project:  
+```
+$ ng new loader
+$ cd loader
+$ ng -v
+@angular/cli: 1.1.1 (e)
+node: 7.8.0
+os: linux ia32
+@angular/animations: 4.2.2
+@angular/common: 4.2.2
+@angular/compiler: 4.2.2
+@angular/core: 4.2.2
+@angular/forms: 4.2.2
+@angular/http: 4.2.2
+@angular/platform-browser: 4.2.2
+@angular/platform-browser-dynamic: 4.2.2
+@angular/router: 4.2.2
+@angular/cli: 1.1.1
+@angular/compiler-cli: 4.2.2
+@angular/language-service: 4.2.2
+```
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+2. Create a "devonly" component:  
+`$ ng generate component devonly --flat`
 
-## Code scaffolding
+3. Eject:  
+`$ ng eject --target=production`
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|module`.
+4. Add missing modules:
+```
+$ npm install
+$ npm install preprocess-loader --save-dev
+```
 
-## Build
+5. Modify webpack.config.js configuration to use preprocess-loader
+```javascript
+...
+      {
+        "test": /\.html$/,
+        "use": [
+          { loader: "raw-loader" },
+          { loader: 'preprocess-loader' }
+        ]
+      },
+...
+      {
+        "test": /\.ts$/,
+        "use": [
+          { loader: "@ngtools/webpack" },
+          { loader: 'preprocess-loader' }
+        ]
+      }
+...
+```
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `-prod` flag for a production build.
+6. Modify app.module.ts so the DevonlyComponent is only included in source in development.
+```typescript
+import { BrowserModule } from '@angular/platform-browser';
+import { NgModule } from '@angular/core';
 
-## Running unit tests
+import { AppComponent } from './app.component';
+// @ifdef DEBUG
+import { DevonlyComponent } from './devonly.component';
+// @endif
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+@NgModule({
+  declarations: [
+    AppComponent,
+    // @ifdef DEBUG
+    DevonlyComponent
+    // @endif
+  ],
+  imports: [
+    BrowserModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule {
 
-## Running end-to-end tests
+    constructor() {
+        // @ifndef DEBUG
+        console.log("Log only in PRODUCTION");
+        // @endif
 
-Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protractortest.org/).
-Before running the tests make sure you are serving the app via `ng serve`.
+        // @ifdef DEBUG
+        console.log("Log only in DEBUG");
+        // @endif
+    }
 
-## Further help
+}
+```
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI README](https://github.com/angular/angular-cli/blob/master/README.md).
+7. Same in app.component.html
+```html
+<!-- @ifdef DEBUG -->
+<app-devonly></app-devonly>
+<!-- @endif -->
+
+<!-- @ifdef DEBUG -->
+<p>DEBUG ONLY</p>
+<!-- @endif -->
+
+<!-- @ifndef DEBUG -->
+<p>PRODUCTION ONLY</p>
+<!-- @endif -->
+```
+
+8. Build the project:  
+ `$ npm run build`
+
+Expected result:  
+- The web console IS NOT showing: "Log only in DEBUG".  
+- The html page IS NOT showing the "devonly" component and IS NOT showing: "DEBUG ONLY".
+
+Actual result:  
+- **KO: The console IS showing: "Log only in DEBUG".**  
+- OK: The html page IS NOT showing the "devonly" component and IS NOT showing: "DEBUG ONLY".
+
+So preprocess-loader is not working for the TypesScript part.  
+
+
+Quick way to check result:
+```
+$ grep -c "Log only in DEBUG" dist/main*.js
+1
+```
+This command must show "0" match.
